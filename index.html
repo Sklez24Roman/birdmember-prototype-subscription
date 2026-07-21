@@ -465,6 +465,7 @@ const S = {
   aircraft: ['Airbus Industrie A310-200', 'Boeing 737-800', 'Airbus A320neo'],
   mariaConnect: 'none',
   elenaConnect: 'none',
+  cancelled: false,
   currentChat: 'dubai',
   visibility: true,
   routes: [
@@ -852,6 +853,30 @@ function openAircraftSheet() {
     <div>${S.aircraft.map(a => `<div class="sheet-row"><span class="ic">${I.plane}</span>${esc(a)}</div>`).join('')}</div>`);
 }
 
+function openManageSheet() {
+  const cancelled = S.cancelled;
+  openSheet(`
+    <div class="sheet-head"><b>Manage subscription</b></div>
+    <div class="pay-row"><span class="ic">${I.crown}</span>
+      <span class="tt"><b>Birdmember Membership · Annual</b><span>€29.99 per year · same price worldwide</span></span>
+    </div>
+    <div class="pay-row"><span class="ic">${I.calendar}</span>
+      <span class="tt"><b>${cancelled ? 'Active until ' + S.activeUntil : 'Renews ' + S.activeUntil}</b><span>${cancelled ? 'Subscription won’t renew' : 'Next charge €29.99'}</span></span>
+    </div>
+    <div class="btns" style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+      ${cancelled
+        ? `<div class="pw-banner amber"><span class="ic">${I.checkCircle}</span>Cancelled — access until ${S.activeUntil}</div>`
+        : `<button class="btn ghost" style="color:#D13B40;border-color:#F5C9CB" onclick="cancelSub()">Cancel subscription</button>`}
+      <button class="btn ghost" onclick="closeSheet()">Done</button>
+    </div>
+    <div class="pw-note" style="margin-top:12px">Opens in your App Store / Google Play account</div>`);
+}
+function cancelSub() {
+  S.cancelled = true;
+  renderAll(); syncDemo();
+  openManageSheet();
+}
+
 /* ======================= payments ======================= */
 function openPaySheet(provider) {
   const apple = provider === 'apple';
@@ -880,6 +905,7 @@ function confirmPay(btn) {
   setTimeout(() => {
     closeSheet();
     S.plan = 'active';
+    S.cancelled = false;
     document.getElementById('successText').textContent = 'Your membership is active until ' + S.activeUntil + '. Time to plan the next layover.';
     renderAll(); syncDemo();
     showView('success');
@@ -1024,7 +1050,9 @@ function renderProfile() {
 }
 
 function membershipStatus() {
-  if (S.plan === 'active') return { sub: 'Active until ' + S.activeUntil, pill: '<span class="status-pill green">Active</span>' };
+  if (S.plan === 'active') return S.cancelled
+    ? { sub: 'Active until ' + S.activeUntil + ' · won’t renew', pill: '<span class="status-pill green">Active</span>' }
+    : { sub: 'Active until ' + S.activeUntil, pill: '<span class="status-pill green">Active</span>' };
   if (S.plan === 'expired') return { sub: 'Expired on ' + S.expiredOn, pill: '<span class="status-pill red">Expired</span>' };
   return { sub: 'Free plan', pill: '<span class="status-pill grey">Free</span>' };
 }
@@ -1066,13 +1094,13 @@ function renderPaywall() {
     </div>
     <div class="pw-note" style="margin-top:14px">€29.99 billed once a year · Renews automatically · Cancel anytime in your store settings</div>`;
   let banner = '';
-  if (S.plan === 'active') banner = `<div class="pw-banner green" style="margin-top:22px"><span class="ic">${I.checkCircle}</span>Active · renews ${S.activeUntil}</div>`;
+  if (S.plan === 'active') banner = `<div class="pw-banner green" style="margin-top:22px"><span class="ic">${I.checkCircle}</span>${S.cancelled ? 'Active until ' + S.activeUntil + ' · won’t renew' : 'Active · renews ' + S.activeUntil}</div>`;
   if (S.plan === 'expired') banner = `<div class="pw-banner amber" style="margin-top:22px"><span class="ic">${I.lock}</span>Expired on ${S.expiredOn}</div>`;
   document.getElementById('pwBody').innerHTML = `
     <div class="pw-hero"><span class="lg">${I.logo.replace('width="29" height="32"', 'width="58" height="63"')}</span>
       <h2>Birdmember Membership</h2><p>Full access to the crew community</p></div>
     ${banner}
-    ${S.plan === 'active' ? feats + `<div class="pw-note" style="margin-top:18px">Manage or cancel anytime in your App Store or Google Play settings</div>` : price + feats + paybtns}`;
+    ${S.plan === 'active' ? feats + `<button class="btn ghost" style="margin-top:18px" onclick="openManageSheet()">Manage subscription</button><div class="pw-note" style="margin-top:12px">Managed via your App Store or Google Play account</div>` : price + feats + paybtns}`;
 }
 
 function renderNotice() {
@@ -1103,6 +1131,7 @@ function syncDemo() {
 demoEl.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
   const st = b.dataset.state;
   S.plan = st;
+  S.cancelled = false;
   if (st === 'trial') S.layoversUsed = 2;
   if (st === 'limits') S.layoversUsed = 3;
   closeSheet(); renderAll(); syncDemo();
