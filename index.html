@@ -381,10 +381,10 @@
 </div>
 
 <div class="demo-states" id="demoStates">
-  <button data-state="trial">Тріал</button>
-  <button data-state="limits">Ліміти</button>
-  <button data-state="active">Підписка</button>
-  <button data-state="expired">Прострочена</button>
+  <button data-state="trial">Trial</button>
+  <button data-state="limits">Limits</button>
+  <button data-state="active">Subscription</button>
+  <button data-state="expired">Expired</button>
 </div>
 
 <script>
@@ -878,37 +878,66 @@ function cancelSub() {
 }
 
 /* ======================= payments ======================= */
-let payState = { provider: 'apple', card: 0, failed: false };
+let payState = { provider: 'apple', card: 0, failed: false, picker: false, adding: false };
 const PAY_CARDS = {
   apple: ['Visa •••• 4921', 'Visa •••• 0002'],
   gpay: ['Mastercard •••• 8004', 'Mastercard •••• 0002']
 };
 function openPaySheet(provider) {
-  payState = { provider, card: 0, failed: false };
+  payState = { provider, card: 0, failed: false, picker: false, adding: false };
   renderPaySheet();
   sheetEl.classList.add('open'); backdropEl.classList.add('open');
 }
 function renderPaySheet() {
   const apple = payState.provider === 'apple';
-  const declined = payState.card === 1;
+  const cards = PAY_CARDS[payState.provider];
+  let cardBlock;
+  if (payState.adding) {
+    cardBlock = `
+    <div style="padding:14px 2px;border-bottom:1px solid var(--grey)">
+      <div style="font-size:13.5px;font-weight:600;margin-bottom:10px">Add card</div>
+      <div class="inp" style="margin-bottom:8px"><input id="newCardNum" placeholder="Card number" inputmode="numeric" maxlength="19"></div>
+      <div style="display:flex;gap:8px">
+        <div class="inp" style="flex:1"><input id="newCardExp" placeholder="MM/YY" maxlength="5"></div>
+        <div class="inp" style="flex:1"><input id="newCardCvc" placeholder="CVC" inputmode="numeric" maxlength="3"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn ghost sm" style="flex:1" onclick="payState.adding=false;renderPaySheet()">Cancel</button>
+        <button class="btn primary sm" style="flex:1" onclick="saveNewCard()">Save card</button>
+      </div>
+    </div>`;
+  } else if (payState.picker && !apple) {
+    cardBlock = cards.map((c, i) => `
+    <div class="pay-row" style="cursor:pointer" onclick="pickPayCard(${i})"><span class="ic">${I.card}</span>
+      <span class="tt"><b>${c}</b><span>Google Pay · James Cooper</span></span>
+      ${i === payState.card ? `<span class="ic" style="width:20px;height:20px;color:var(--blue)">${I.check}</span>` : ''}
+    </div>`).join('') + `
+    <div class="pay-row" style="cursor:pointer" onclick="payState.adding=true;renderPaySheet()">
+      <span class="ic" style="color:var(--blue)">${I.plusCircle}</span>
+      <span class="tt"><b style="color:var(--blue)">Add card</b><span>Pay with a new credit or debit card</span></span>
+    </div>`;
+  } else {
+    cardBlock = `
+    <div class="pay-row" style="cursor:pointer" onclick="${apple ? 'togglePayCard()' : 'payState.picker=true;renderPaySheet()'}"><span class="ic">${I.card}</span>
+      <span class="tt"><b>${cards[payState.card]}</b><span>${apple ? 'Apple Pay' : 'Google Pay'} · James Cooper</span></span>
+      <span class="chev" style="width:20px;height:20px;color:var(--grey2);transform:rotate(-90deg);display:flex">${I.chevron}</span>
+    </div>`;
+  }
   sheetEl.innerHTML = `<div class="handle"></div>
     <div class="pay-head" style="gap:6px">${apple
       ? `<span style="width:20px;height:24px;display:flex">${I.apple}</span><span style="font-size:19px;font-weight:600;font-family:-apple-system,'Segoe UI',sans-serif">Pay</span>`
       : `<span style="width:24px;height:24px;display:flex">${I.gpayG}</span><span style="font-size:19px;font-weight:600;color:#3C4043;font-family:Roboto,'Segoe UI',sans-serif">Pay</span>`}
     </div>
-    <div class="pay-row" style="cursor:pointer" onclick="togglePayCard()"><span class="ic">${I.card}</span>
-      <span class="tt"><b>${PAY_CARDS[payState.provider][payState.card]}</b><span>${apple ? 'Apple Pay' : 'Google Pay'} · James Cooper</span></span>
-      <span class="chev" style="width:20px;height:20px;color:var(--grey2);transform:rotate(-90deg);display:flex">${I.chevron}</span>
-    </div>
+    ${cardBlock}
     <div class="pay-row"><span class="ic">${I.crown}</span>
       <span class="tt"><b>Birdmember Membership · Annual</b><span>Renews automatically · Cancel anytime</span></span>
     </div>
     <div class="pay-total"><span>Pay Birdmember</span><b>€29.99</b></div>
     ${payState.failed ? `<div class="pw-banner" style="margin-top:12px;background:#FDE8E8;color:#D13B40"><span class="ic">${I.x}</span><span><b style="display:block;font-size:13.5px">Payment not completed</b><span style="font-weight:400;font-size:12px">Your card was declined. Try another payment method.</span></span></div>` : ''}
     <div class="btns" style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
-      <button class="paybtn ${apple ? 'apple' : ''}" style="${apple ? '' : 'background:#1A73E8;color:#fff'}" id="payConfirm" onclick="confirmPay(this)">
+      ${payState.adding ? '' : `<button class="paybtn ${apple ? 'apple' : ''}" style="${apple ? '' : 'background:#1A73E8;color:#fff'}" id="payConfirm" onclick="confirmPay(this)">
         ${payState.failed ? 'Try again' : apple ? `<span style="width:20px;height:20px;display:flex">${I.faceid}</span>Confirm with Face ID` : 'Pay €29.99'}
-      </button>
+      </button>`}
     </div>`;
 }
 function togglePayCard() {
@@ -916,11 +945,32 @@ function togglePayCard() {
   payState.failed = false;
   renderPaySheet();
 }
+function pickPayCard(i) {
+  payState.card = i;
+  payState.picker = false;
+  payState.failed = false;
+  renderPaySheet();
+}
+function saveNewCard() {
+  const numEl = document.getElementById('newCardNum');
+  const num = (numEl.value || '').replace(/\D/g, '');
+  if (num.length < 12) {
+    const box = numEl.closest('.inp');
+    box.classList.add('err');
+    setTimeout(() => box.classList.remove('err'), 900);
+    return;
+  }
+  PAY_CARDS.gpay.push('Visa •••• ' + num.slice(-4));
+  payState.card = PAY_CARDS.gpay.length - 1;
+  payState.adding = false;
+  payState.picker = false;
+  renderPaySheet();
+}
 function confirmPay(btn) {
   btn.innerHTML = '<span class="spin"></span>';
   btn.style.pointerEvents = 'none';
   setTimeout(() => {
-    if (payState.card === 1) {           /* declined card — state unchanged */
+    if (PAY_CARDS[payState.provider][payState.card].includes('0002')) {   /* declined card — state unchanged */
       payState.failed = true;
       renderPaySheet();
       return;
@@ -1154,6 +1204,8 @@ demoEl.querySelectorAll('button').forEach(b => b.addEventListener('click', () =>
   const st = b.dataset.state;
   S.plan = st;
   S.cancelled = false;
+  S.mariaConnect = 'none';
+  S.elenaConnect = 'none';
   if (st === 'trial') S.layoversUsed = 2;
   if (st === 'limits') S.layoversUsed = 3;
   closeSheet(); renderAll(); syncDemo();
